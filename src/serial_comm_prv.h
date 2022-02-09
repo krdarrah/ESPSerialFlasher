@@ -141,6 +141,12 @@ typedef struct __attribute__((packed))
 typedef struct __attribute__((packed))
 {
     command_common_t common;
+
+} eraseAllCommad_t;
+
+typedef struct __attribute__((packed))
+{
+    command_common_t common;
     uint32_t address;
     uint32_t size;
     uint32_t reserved_0;

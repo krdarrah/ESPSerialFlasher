@@ -395,6 +395,31 @@ esp_loader_error_t loader_change_baudrate_cmd(uint32_t baudrate)
     return send_cmd(&baudrate_cmd, sizeof(baudrate_cmd), NULL);
 }
 
+esp_loader_error_t loader_eraseAllFlash_cmd()
+{
+//    eraseAllCommad_t eraseAllCommad = {
+//        .common = {
+//            .direction = WRITE_DIRECTION,
+//            .command = 0xD0,
+//            .size = CMD_SIZE(eraseAllCommad),
+//            .checksum = 0
+//        },
+//    };
+    
+    response_t response;
+    //command_t command = ((command_common_t *)cmd_data)->command;
+    uint8_t commandData[]={0xD0, 150};
+//    RETURN_ON_ERROR( SLIP_send_delimiter() );
+//    //serial_write(0xD0, 1);
+//    RETURN_ON_ERROR( SLIP_send((const uint8_t *)commandData, 2) );
+//    RETURN_ON_ERROR( SLIP_send_delimiter() );
+//
+//    //return send_cmd(0xD0, 1, NULL);
+  
+   // return check_response(0xD0, NULL, &response, sizeof(response));
+    return send_cmd(&commandData, sizeof(commandData), NULL);
+}
+
 esp_loader_error_t loader_md5_cmd(uint32_t address, uint32_t size, uint8_t *md5_out)
 {
     spi_flash_md5_command_t md5_cmd = {

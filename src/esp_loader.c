@@ -87,22 +87,44 @@ esp_loader_error_t esp_loader_connect(esp_loader_connect_args_t *connect_args)
     uint32_t spi_config;
     esp_loader_error_t err;
     int32_t trials = connect_args->trials;
-
-    loader_port_enter_bootloader();
-
+    greenLED(false);
+    //loader_port_enter_bootloader();
+    for(int i=0; i<10; i++){
+    yelLED(false);
+    loader_port_reset_target();
+    loader_port_delay_ms(500);
+    yelLED(true);
+    trials = connect_args->trials;
+        loader_port_debug_print("_");
     do {
+        yelLED(false);
         loader_port_start_timer(connect_args->sync_timeout);
         err = loader_sync_cmd();
         if (err == ESP_LOADER_ERROR_TIMEOUT) {
+            //loader_port_enter_bootloader();
+            loader_port_debug_print(".");
             if (--trials == 0) {
-                return ESP_LOADER_ERROR_TIMEOUT;
+                break;
+               // return ESP_LOADER_ERROR_TIMEOUT;
             }
-            loader_port_delay_ms(100);
+            yelLED(true);
+            loader_port_delay_ms(200);//was 100
+            
         } else if (err != ESP_LOADER_SUCCESS) {
-            return err;
+            break;
+            //return err;
         }
     } while (err != ESP_LOADER_SUCCESS);
-
+        if(err==ESP_LOADER_SUCCESS){
+            for(int i=0; i<20; i++){
+                greenLED(true);
+                loader_port_delay_ms(20);
+                greenLED(false);
+                loader_port_delay_ms(20);
+            }
+            break;
+        }
+    }
     RETURN_ON_ERROR( loader_detect_chip(&s_target, &s_reg) );
 
     if (s_target == ESP8266_CHIP) {
@@ -232,12 +254,15 @@ static esp_loader_error_t detect_flash_size(size_t *flash_size)
 
 esp_loader_error_t esp_loader_flash_start(uint32_t offset, uint32_t image_size, uint32_t block_size)
 {
+    yelLED(true);
+    greenLED(false);
     uint32_t blocks_to_write = (image_size + block_size - 1) / block_size;
     uint32_t erase_size = block_size * blocks_to_write;
     s_flash_write_size = block_size;
 
     size_t flash_size = 0;
     if (detect_flash_size(&flash_size) == ESP_LOADER_SUCCESS) {
+
         if (image_size > flash_size) {
             return ESP_LOADER_ERROR_IMAGE_SIZE;
         }

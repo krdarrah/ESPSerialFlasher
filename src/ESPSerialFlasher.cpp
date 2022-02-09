@@ -7,38 +7,96 @@
 
 static int32_t s_time_end;
 
+const int RXD2=16;
+const int TXD2=17;
+const int RESET_ESP_PIN=4;
+const int yelLED_pin = 33;
+const int greenLED_pin = 32;
+const int redLED_pin = 22;
+
 Print * ESPDebugPort = &Serial;
 bool ESPDebug = false;
 
 void ESPFlasherInit( bool _debug, Print * _debugPort ){
-SerialNina.begin(115200);
-pinMode(NINA_RESETN, OUTPUT);
-pinMode(NINA_GPIO0, OUTPUT);
-ESPDebug = _debug;
-ESPDebugPort = _debugPort;
-if(ESPDebug) ESPDebugPort->println("ESP Flasher Init");
+    Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
+    //SerialNina.begin(115200);
+    pinMode(yelLED_pin, OUTPUT);
+    digitalWrite(yelLED_pin, HIGH);
+    pinMode(RESET_ESP_PIN, OUTPUT);
+    pinMode(greenLED_pin, OUTPUT);
+    digitalWrite(greenLED_pin, HIGH);
+    //pinMode(NINA_GPIO0, OUTPUT);
+    ESPDebug = _debug;
+    ESPDebugPort = _debugPort;
+    if(ESPDebug) ESPDebugPort->println("ESP Flasher Init");
 }
 
-void ESPFlasherConnect(){
-	
-	connect_to_target(115200);
-	
+void yelLED(bool state){
+    pinMode(yelLED_pin, OUTPUT);
+    digitalWrite(yelLED_pin, state);
 }
 
-void ESPFlashBin(const char* binFilename){
+
+void redLED(bool state){
+    pinMode(redLED_pin, OUTPUT);
+    digitalWrite(redLED_pin, state);
+}
+void greenLED(bool state){
+    pinMode(greenLED_pin, OUTPUT);
+    digitalWrite(greenLED_pin, state);
+}
+void greenLEDflash(){
+    pinMode(greenLED_pin, OUTPUT);
+    digitalWrite(greenLED_pin, !digitalRead(greenLED_pin));
+}
+
+bool ESPFlasherConnect(){
+    //loader_port_reset_target();
+    //esp_loader_change_baudrate(115200);
+    if(connect_to_target(921600) != ESP_LOADER_SUCCESS)
+        return false;
+    else
+        return true;
+}
+
+bool ESPFlashBin(const char* binFilename, unsigned long startAddress){
+    //ESPDebugPort->println("erasing all");
+    //ESPDebugPort->println(loader_eraseAllFlash_cmd());
+    //ESPDebugPort->println("erasing done");
+    
 	if(ESPDebug) ESPDebugPort->println("WARNING! DO NOT INTERRUPT OR WIFI-MODULE WILL BE CORRUPT");
 	if(SD.exists(binFilename)){
+        if(ESPDebug) ESPDebugPort->print("Found File ");
+        if(ESPDebug) ESPDebugPort->println(binFilename);
         File UpdateFile = SD.open(binFilename, FILE_READ);
         size_t size = UpdateFile.size();
+        if(ESPDebug) ESPDebugPort->print("File Size ");
+        if(ESPDebug) ESPDebugPort->println(size);
         if(size <= 0x247000){
-        flash_binary(UpdateFile,  size,  0x0);
+            if(flash_binary(UpdateFile,  size,  startAddress)==ESP_LOADER_SUCCESS){
+                UpdateFile.close();
+                loader_port_reset_target();
+                return true;
+            }
+            else{
+                UpdateFile.close();
+                loader_port_reset_target();
+                return false;
+            }
         } else {
             if(ESPDebug) ESPDebugPort->println("File too large for partition");
+            return false;
         }
         UpdateFile.close();
+        loader_port_reset_target();
+        
 	}
-    else if(ESPDebug) ESPDebugPort->println("File doesnt exist");
-    loader_port_reset_target();
+    else{
+        if(ESPDebug) ESPDebugPort->println("File doesnt exist");
+        loader_port_reset_target();
+        return false;
+    }
+    
 }
 
 void ESPFlashCert(const char* certFilename){
@@ -76,7 +134,7 @@ esp_loader_error_t loader_port_serial_write(const uint8_t *data, uint16_t size, 
 {
     
 
-   size_t err = SerialNina.write((const char *)data, size);
+   size_t err = Serial2.write((const char *)data, size);
 
     if (err == size) {
         return ESP_LOADER_SUCCESS;
@@ -88,8 +146,8 @@ esp_loader_error_t loader_port_serial_write(const uint8_t *data, uint16_t size, 
 
 esp_loader_error_t loader_port_serial_read(uint8_t *data, uint16_t size, uint32_t timeout)
 {
-	SerialNina.setTimeout(timeout);
-    int read = SerialNina.readBytes( data, size);
+	Serial2.setTimeout(timeout);
+    int read = Serial2.readBytes( data, size);
 
     if (read < 0) {
         return ESP_LOADER_ERROR_FAIL;
@@ -105,18 +163,18 @@ esp_loader_error_t loader_port_serial_read(uint8_t *data, uint16_t size, uint32_
 // assert reset pin for 50 milliseconds.
 void loader_port_enter_bootloader(void)
 {
-    digitalWrite(NINA_GPIO0, 0);
+    digitalWrite(RESET_ESP_PIN, 0);
     loader_port_reset_target();
     loader_port_delay_ms(50);
-    digitalWrite(NINA_GPIO0, 1);
+    digitalWrite(RESET_ESP_PIN, 1);
 }
 
 
 void loader_port_reset_target(void)
 {
-    digitalWrite(NINA_RESETN, 0);
-    loader_port_delay_ms(50);
-    digitalWrite(NINA_RESETN, 1);
+    digitalWrite(RESET_ESP_PIN, 0);
+    loader_port_delay_ms(100);
+    digitalWrite(RESET_ESP_PIN, 1);
 }
 
 
@@ -146,9 +204,13 @@ void loader_port_debug_print(const char *str)
 
 esp_loader_error_t loader_port_change_baudrate(uint32_t baudrate)
 {
-    SerialNina.begin(baudrate);
-    int err = SerialNina;
-    return (err == true) ? ESP_LOADER_SUCCESS : ESP_LOADER_ERROR_FAIL;
+    Serial2.updateBaudRate(baudrate);
+    //Serial2.end();
+    //Serial2.begin(baudrate, SERIAL_8N1, RXD2, TXD2);
+    //Serial2.begin(baudrate);
+    //int err = Serial2;
+    //return (err == true) ? ESP_LOADER_SUCCESS : ESP_LOADER_ERROR_FAIL;
+    return ESP_LOADER_SUCCESS;
 }
 
 esp_loader_error_t connect_to_target(uint32_t higher_baudrate)
@@ -157,15 +219,18 @@ esp_loader_error_t connect_to_target(uint32_t higher_baudrate)
 
     esp_loader_error_t err = esp_loader_connect(&connect_config);
     if (err != ESP_LOADER_SUCCESS) {
-        if(ESPDebug) ESPDebugPort->print("Cannot connect to target. Error: %u\n");
-        if(ESPDebug) ESPDebugPort->print(err);
+        if(ESPDebug) ESPDebugPort->print("Cannot connect to target. Error:");
+        if(ESPDebug) ESPDebugPort->println(err);
         return err;
     }
     if(ESPDebug) ESPDebugPort->print("Connected to target\n");
-    //if(ESPDebug) ESPDebugPort->println(esp_loader_get_target());
+    if(ESPDebug) ESPDebugPort->println(esp_loader_get_target());
 
     if (higher_baudrate && esp_loader_get_target() != ESP8266_CHIP) {
+        //if(ESPDebug) ESPDebugPort->print("changing baudrate\n");
         err = esp_loader_change_baudrate(higher_baudrate);
+       // if(ESPDebug) ESPDebugPort->print("almost done changing baudrate\n");
+        
         if (err == ESP_LOADER_ERROR_UNSUPPORTED_FUNC) {
             if(ESPDebug) ESPDebugPort->print("ESP8266 does not support change baudrate command.");
             return err;
@@ -173,7 +238,9 @@ esp_loader_error_t connect_to_target(uint32_t higher_baudrate)
             if(ESPDebug) ESPDebugPort->print("Unable to change baud rate on target.");
             return err;
         } else {
+          //  if(ESPDebug) ESPDebugPort->print("changing loader baud\n");
             err = loader_port_change_baudrate(higher_baudrate);
+           // if(ESPDebug) ESPDebugPort->print("done changing loader\n");
             if (err != ESP_LOADER_SUCCESS) {
                 if(ESPDebug) ESPDebugPort->print("Unable to change baud rate.");
                 return err;
@@ -186,9 +253,9 @@ esp_loader_error_t connect_to_target(uint32_t higher_baudrate)
 }
 
 
-esp_loader_error_t flash_binary(File file, size_t size, size_t address)
+esp_loader_error_t flash_binary(File file, size_t size, unsigned long address)
 {
-		
+    digitalWrite(greenLED_pin, LOW);
 	
     esp_loader_error_t err;
     uint8_t payload[1024];
@@ -205,6 +272,7 @@ esp_loader_error_t flash_binary(File file, size_t size, size_t address)
     size_t written = 0;
     int previousProgress = -1;
     while (size > 0) {
+        digitalWrite(yelLED_pin, !digitalRead(yelLED_pin));
         size_t to_read = MIN(size, sizeof(payload));
         file.read(payload,to_read);
         err = esp_loader_flash_write(payload, to_read);
@@ -224,7 +292,8 @@ esp_loader_error_t flash_binary(File file, size_t size, size_t address)
         if(ESPDebug) ESPDebugPort->print(progress);if(ESPDebug) ESPDebugPort->print(",");
        	}
     };
-
+    digitalWrite(yelLED_pin, LOW);
+    digitalWrite(greenLED_pin, HIGH);
     if(ESPDebug) ESPDebugPort->print("\nFinished programming\n");
 
 #if MD5_ENABLED

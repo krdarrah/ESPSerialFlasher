@@ -14,7 +14,7 @@
  */
 
 #pragma once
-
+#define MD5_ENABLED true
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -30,6 +30,8 @@ extern "C" {
 #ifndef MIN
 #define MIN(a, b) ((a) < (b)) ? (a) : (b)
 #endif
+
+
 
 /**
  * Macro which can be used to check the error code,
@@ -96,8 +98,8 @@ typedef struct {
 } esp_loader_connect_args_t;
 
 #define ESP_LOADER_CONNECT_DEFAULT() { \
-  .sync_timeout = 100, \
-  .trials = 10, \
+  .sync_timeout = 150, \
+  .trials = 3, \
 }
 
 /**
@@ -227,6 +229,8 @@ esp_loader_error_t esp_loader_change_baudrate(uint32_t baudrate);
   *     - ESP_LOADER_ERROR_INVALID_RESPONSE Internal error
   *     - ESP_LOADER_ERROR_UNSUPPORTED_FUNC Unsupported on the target
   */
+esp_loader_error_t loader_eraseAllFlash_cmd();
+
 #if MD5_ENABLED
 esp_loader_error_t esp_loader_flash_verify(void);
 #endif

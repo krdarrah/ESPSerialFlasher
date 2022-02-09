@@ -16,3 +16,4 @@ ESPFlasherInit		KEYWORD2
 ESPFlasherConnect	KEYWORD2
 ESPFlashBin			KEYWORD2
 ESPFlashCert		KEYWORD2
+greenLED			KEYWORD2
